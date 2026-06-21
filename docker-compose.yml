@@ -128,6 +128,36 @@ services:
     networks:
       - banking-network
 
+  api:
+    image: core-banking-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: core-banking-api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/banking_db
+      DB_USER: bank
+      DB_PASS: bank_pass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      JWT_SECRET: change-me-in-production-use-a-rsa-key-at-least-32-chars-long
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - banking-network
+
 volumes:
   postgres-data:
     name: core-banking-postgres-data
