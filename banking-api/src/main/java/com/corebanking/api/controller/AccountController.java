@@ -1,11 +1,13 @@
 package com.corebanking.api.controller;
 
 import com.corebanking.account.entity.Account;
+import com.corebanking.account.repository.AccountRepository;
 import com.corebanking.account.service.AccountCommandService;
 import com.corebanking.query.entity.AccountBalance;
 import com.corebanking.query.entity.TransactionHistory;
 import com.corebanking.query.service.AccountQueryService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -14,6 +16,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -30,6 +35,7 @@ public class AccountController {
 
     private final AccountCommandService accountCommandService;
     private final AccountQueryService accountQueryService;
+    private final AccountRepository accountRepository;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -103,6 +109,30 @@ public class AccountController {
         return ResponseEntity.ok(accountQueryService.getTransactionHistory(id, page, size));
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'AUDITOR')")
+    public ResponseEntity<List<AccountResponse>> listAccounts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
+        Page<Account> accounts = accountRepository.findAll(pageable);
+        return ResponseEntity.ok(accounts.stream().map(this::toResponse).toList());
+    }
+
+    @PostMapping("/{id}/freeze")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AccountResponse> freezeAccount(@PathVariable UUID id) {
+        Account account = accountCommandService.freezeAccount(id);
+        return ResponseEntity.ok(toResponse(account));
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AccountResponse> closeAccount(@PathVariable UUID id) {
+        Account account = accountCommandService.closeAccount(id);
+        return ResponseEntity.ok(toResponse(account));
+    }
+
     private AccountResponse toResponse(Account account) {
         return AccountResponse.builder()
                 .id(account.getId())
@@ -134,7 +164,7 @@ public class AccountController {
     public static class CreateAccountRequest {
         @NotBlank private String accountNumber;
         @NotBlank private String ownerName;
-        @NotBlank private String ownerEmail;
+        @NotBlank @Email private String ownerEmail;
         private String currency;
         private BigDecimal overdraftLimit;
     }

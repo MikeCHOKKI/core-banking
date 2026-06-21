@@ -192,4 +192,67 @@ public class AccountCommandService {
         return accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Account not found: " + accountNumber));
     }
+
+    /**
+     * Gèle un compte actif. Le compte passe en statut FROZEN.
+     * Aucune opération de dépôt/retrait n'est plus possible.
+     */
+    @Transactional
+    public Account freezeAccount(UUID accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found: " + accountId));
+
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalStateException("Cannot freeze account with status: " + account.getStatus());
+        }
+
+        account.setStatus(AccountStatus.FROZEN);
+        account = accountRepository.save(account);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("accountId", accountId.toString());
+        data.put("accountNumber", account.getAccountNumber());
+        data.put("previousStatus", AccountStatus.ACTIVE.name());
+        data.put("newStatus", AccountStatus.FROZEN.name());
+
+        eventPublisher.publish("Account", accountId.toString(),
+                EventType.ACCOUNT_FROZEN.name(), data, null);
+
+        log.info("Account frozen: {} ({})", account.getAccountNumber(), accountId);
+        return account;
+    }
+
+    /**
+     * Clôture un compte. Le solde doit être nul.
+     * Le compte passe en statut CLOSED quelle que soit son statut antérieur (sauf déjà CLOSED).
+     */
+    @Transactional
+    public Account closeAccount(UUID accountId) {
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found: " + accountId));
+
+        if (account.getStatus() == AccountStatus.CLOSED) {
+            throw new IllegalStateException("Account is already closed");
+        }
+
+        if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {
+            throw new IllegalStateException("Cannot close account with non-zero balance: " + account.getBalance());
+        }
+
+        AccountStatus previousStatus = account.getStatus();
+        account.setStatus(AccountStatus.CLOSED);
+        account = accountRepository.save(account);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("accountId", accountId.toString());
+        data.put("accountNumber", account.getAccountNumber());
+        data.put("previousStatus", previousStatus.name());
+        data.put("newStatus", AccountStatus.CLOSED.name());
+
+        eventPublisher.publish("Account", accountId.toString(),
+                EventType.ACCOUNT_CLOSED.name(), data, null);
+
+        log.info("Account closed: {} ({})", account.getAccountNumber(), accountId);
+        return account;
+    }
 }
