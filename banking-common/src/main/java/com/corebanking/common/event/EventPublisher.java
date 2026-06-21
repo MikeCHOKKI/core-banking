@@ -19,4 +19,19 @@ public interface EventPublisher {
      */
     void publish(String aggregateType, String aggregateId, String eventType,
                  Map<String, Object> data, Map<String, Object> metadata);
+
+    /**
+     * Publie un événement métier avec garantie d'idempotence.
+     * Permet d'éviter la duplication d'événements en cas de retry.
+     *
+     * @param aggregateType   type d'agrégat (ex: "Account")
+     * @param aggregateId     identifiant de l'agrégat
+     * @param eventType       type d'événement (ex: "TRANSFER_SENT")
+     * @param data            données de l'événement
+     * @param metadata        métadonnées additionnelles (peut être null)
+     * @param idempotencyKey  clé d'idempotence unique pour déduplication
+     */
+    void publishWithIdempotency(String aggregateType, String aggregateId, String eventType,
+                                Map<String, Object> data, Map<String, Object> metadata,
+                                String idempotencyKey);
 }
