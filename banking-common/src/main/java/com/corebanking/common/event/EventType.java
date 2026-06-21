@@ -1,0 +1,12 @@
+package com.corebanking.common.event;
+
+public enum EventType {
+    ACCOUNT_CREATED,
+    ACCOUNT_FROZEN,
+    ACCOUNT_CLOSED,
+    DEPOSIT_EXECUTED,
+    WITHDRAWAL_EXECUTED,
+    TRANSFER_SENT,
+    TRANSFER_RECEIVED,
+    OVERDRAFT_APPLIED
+}

@@ -1,0 +1,142 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: core-banking-postgres
+    hostname: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: banking_db
+      POSTGRES_USER: bank
+      POSTGRES_PASSWORD: bank_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank -d banking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - banking-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.2
+    container_name: core-banking-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      # KRaft mode (no Zookeeper)
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Topics & replication
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server localhost:9092 --list || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - banking-network
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.7.2
+    container_name: core-banking-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo "Creating topics..."
+      kafka-topics --create --if-not-exists \
+        --topic banking.events \
+        --partitions 3 \
+        --replication-factor 1 \
+        --bootstrap-server kafka:29092
+      kafka-topics --create --if-not-exists \
+        --topic banking.notifications \
+        --partitions 1 \
+        --replication-factor 1 \
+        --bootstrap-server kafka:29092
+      kafka-topics --create --if-not-exists \
+        --topic banking.idempotency \
+        --partitions 1 \
+        --replication-factor 1 \
+        --bootstrap-server kafka:29092
+      echo "Topics created successfully."
+      kafka-topics --list --bootstrap-server kafka:29092
+    restart: "no"
+    networks:
+      - banking-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: core-banking-redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --save 60 1
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - banking-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: core-banking-kafka-ui
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: core-banking
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - banking-network
+
+volumes:
+  postgres-data:
+    name: core-banking-postgres-data
+  kafka-data:
+    name: core-banking-kafka-data
+  redis-data:
+    name: core-banking-redis-data
+
+networks:
+  banking-network:
+    name: core-banking-network
+    driver: bridge

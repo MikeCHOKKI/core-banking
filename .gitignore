@@ -1,0 +1,63 @@
+### Maven ###
+target/
+*.class
+*.jar
+*.war
+*.ear
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+dependency-reduced-pom.xml
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.factorypath
+
+### Eclipse ###
+.settings/
+.project
+.classpath
+.factorypath
+bin/
+*.tmp
+*.bak
+
+### VS Code ###
+.vscode/
+.settings/
+*.code-workspace
+
+### OS ###
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+### Environment ###
+.env
+.env.local
+.env.*.local
+
+### Logs ###
+logs/
+*.log
+log/
+
+### Docker ###
+docker-compose.override.yml
+
+### Temp ###
+*.tmp
+*.bak
+~$*
+
+### OpenCode ###
+.opencode/
+.agents/
