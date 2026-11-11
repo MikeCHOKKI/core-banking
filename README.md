@@ -127,4 +127,4 @@ Les tests utilisent Testcontainers pour PostgreSQL, Kafka et Redis.
 
 ## 📄 License
 
-Propriétaire — Core Banking
+[MIT](LICENSE) — © 2026 Mike E.S. Chokki
